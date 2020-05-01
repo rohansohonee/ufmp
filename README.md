@@ -18,7 +18,7 @@ To get the latest dependencies:
 - **From VS Code:** Click ``Get Packages`` located in right side of the action ribbon at the top of pubspec.yaml.
 
 ## Credits
-- [audio_service](https://pub.dev/packages/audio_service) and [just_audio](https://github.com/ryanheise/just_audio) plugin developed by 
+- [audio_service](https://pub.dev/packages/audio_service) and [just_audio](https://pub.dev/packages/just_audio) plugin developed by 
 [Ryan Heise](https://github.com/ryanheise)
 - The [Flutter](https://flutter.dev) and [Dart](https://dart.dev) team.
 - [dio](https://pub.dev/packages/dio) developed by [FlutterChinaClub](https://flutterchina.club/)
