@@ -2,7 +2,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:ufmp/data/musicCatalog.dart';
-import 'package:ufmp/utils/mediaItemRaw.dart';
 import 'package:ufmp/utils/parseDuration.dart';
 
 import 'home.dart';
@@ -25,24 +24,30 @@ class CatalogList extends StatelessWidget {
           title: Text(data[index].title),
           subtitle: Text(data[index].artist),
           trailing: Text(prettyDuration(data[index].duration)),
-          onTap: () => play(data[index].id, index),
+          onTap: () => play(data[index].id),
         );
       },
     );
   }
 
-  play(String id, int index) async {
+  play(String id) async {
     if (AudioService.running) {
+      // The service is already running, hence we begin playback.
       AudioService.playFromMediaId(id);
     } else {
+      // Start background music playback.
       if (await AudioService.start(
         backgroundTaskEntrypoint: backgroundTaskEntrypoint,
+        androidNotificationChannelName: 'Playback',
+        notificationColor: 0xFF2196f3,
         androidStopForegroundOnPause: true,
+        enableQueue: true,
       )) {
-        // convert music catalog to mediaitem data type.
-        // Also make it raw so that message codecs can accept it.
+        /* Process for setting up the queue */
+
+        // 1.Convert music catalog to mediaitem data type.
         final queue = data.map((catalog) {
-          return mediaItem2raw(MediaItem(
+          return MediaItem(
             id: catalog.id,
             album: catalog.album,
             title: catalog.title,
@@ -50,15 +55,15 @@ class CatalogList extends StatelessWidget {
             duration: durationInMillis(catalog.duration),
             genre: catalog.genre,
             artUri: catalog.image,
-            extras: {'index': index, 'source': catalog.source},
-          ));
+            extras: {'source': catalog.source},
+          );
         }).toList();
-        // Now we send our queue data to the audio player task along
-        // with the index.
-        AudioService.customAction(
-          'audio_task',
-          {'queue': queue, 'index': index},
-        );
+
+        // 2.Now we add our queue to audio player task.
+        await AudioService.addQueueItems(queue);
+
+        // 3.Let's now begin the playback.
+        AudioService.playFromMediaId(id);
       }
     }
   }
