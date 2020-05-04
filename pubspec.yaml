@@ -20,7 +20,7 @@ dependencies:
   flutter:
     sdk: flutter
   just_audio: ^0.1.8
-  audio_service: ^0.7.2
+  audio_service: ^0.8.0
   json_annotation: ^3.0.1
   dio: ^3.0.9
   dio_http_cache: ^0.2.6
