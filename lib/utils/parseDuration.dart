@@ -1,4 +1,4 @@
-/// convert duration string to int in milliseconds
+/// convert duration from seconds to milliseconds.
 int durationInMillis(int duration) {
   return Duration(seconds: duration).inMilliseconds;
 }
