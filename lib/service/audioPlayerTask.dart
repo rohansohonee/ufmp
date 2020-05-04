@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:ufmp/utils/mediaItemRaw.dart';
 
 final playControl = MediaControl(
   androidIcon: 'drawable/ic_action_play_arrow',
@@ -30,35 +29,19 @@ class AudioPlayerTask extends BackgroundAudioTask {
   final AudioPlayer _audioPlayer = AudioPlayer();
   int _queueIndex = -1;
   static int clickDelay = 0;
-  List<MediaItem> _queue;
+  List<MediaItem> _queue = List<MediaItem>();
   final _completer = Completer();
-  bool _playing;
+  bool _playing = false;
 
   bool get hasNext => _queueIndex + 1 < _queue.length;
 
   bool get hasPrevious => _queueIndex > 0;
 
-  MediaItem get mediaItem => _queue[_queueIndex];
-
-  // Our own customStart function that receives the queue.
-  Future<void> customStart() async {
-    // Set the queue.
-    AudioServiceBackground.setQueue(_queue);
-
-    // Let us set the media item
-    AudioServiceBackground.setMediaItem(mediaItem);
-
-    // Now we set the source url and begin playback.
-    await _audioPlayer.setUrl(mediaItem.extras['source']);
-    onPlay();
-  }
+  MediaItem get _mediaItem => _queue[_queueIndex];
 
   @override
   Future<void> onStart() async {
-    // Broadcast that we are playing.
-    _playing = true;
-    _setState(state: BasicPlaybackState.playing);
-
+    // Audio playback completed listener.
     var playerStateSubscription = _audioPlayer.playbackStateStream
         .where((state) => state == AudioPlaybackState.completed)
         .listen((state) {
@@ -75,7 +58,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
     // Clean up resources
     _queue = null;
     playerStateSubscription.cancel();
-    _audioPlayer.dispose();
+    await _audioPlayer.dispose();
   }
 
   void _handlePlaybackCompleted() {
@@ -123,13 +106,14 @@ class AudioPlayerTask extends BackgroundAudioTask {
     }
     _queueIndex = newIndex;
     // Broadcast that we're skipping.
-    if (offset == -1)
-      _setState(state: BasicPlaybackState.skippingToPrevious);
-    else
-      _setState(state: BasicPlaybackState.skippingToNext);
+    _setState(
+      state: offset == -1
+          ? BasicPlaybackState.skippingToPrevious
+          : BasicPlaybackState.skippingToNext,
+    );
 
-    AudioServiceBackground.setMediaItem(mediaItem);
-    await _audioPlayer.setUrl(mediaItem.extras['source']);
+    AudioServiceBackground.setMediaItem(_mediaItem);
+    await _audioPlayer.setUrl(_mediaItem.extras['source']);
     onPlay();
   }
 
@@ -140,19 +124,27 @@ class AudioPlayerTask extends BackgroundAudioTask {
 
   @override
   void onClick(MediaButton button) {
-    // Implemented 'double tap to skip' feature for headset
-    // using a click delay.
-    if (MediaButton.media == button) {
-      clickDelay++;
-      if (clickDelay == 1)
-        Future.delayed(Duration(milliseconds: 250), () {
-          if (clickDelay == 1) playPause();
-          if (clickDelay == 2) onSkipToNext();
-          clickDelay = 0;
-        });
+    switch (button) {
+      case MediaButton.media:
+        // Implemented 'double tap to skip' feature for headset
+        // using a click delay.
+        clickDelay++;
+        if (clickDelay == 1)
+          Future.delayed(Duration(milliseconds: 250), () {
+            if (clickDelay == 1) playPause();
+            if (clickDelay == 2) onSkipToNext();
+            clickDelay = 0;
+          });
+
+        break;
+      case MediaButton.next:
+        onSkipToNext();
+        break;
+      case MediaButton.previous:
+        onSkipToPrevious();
+        break;
+      default:
     }
-    if (MediaButton.next == button) onSkipToNext();
-    if (MediaButton.previous == button) onSkipToPrevious();
   }
 
   @override
@@ -161,15 +153,21 @@ class AudioPlayerTask extends BackgroundAudioTask {
       await _audioPlayer.stop();
     }
     _queueIndex = _queue.indexWhere((test) => test.id == mediaId);
-    AudioServiceBackground.setMediaItem(mediaItem);
-    await _audioPlayer.setUrl(mediaItem.extras['source']);
+    AudioServiceBackground.setMediaItem(_mediaItem);
+    await _audioPlayer.setUrl(_mediaItem.extras['source']);
     onPlay();
   }
 
   @override
-  void onStop() {
-    _audioPlayer.stop();
+  Future<void> onStop() async {
+    await _audioPlayer.stop();
     _completer.complete();
+  }
+
+  @override
+  void onAddQueueItem(MediaItem mediaItem) {
+    _queue.add(mediaItem);
+    AudioServiceBackground.setQueue(_queue);
   }
 
   /* Manage Audio Focus */
@@ -200,42 +198,23 @@ class AudioPlayerTask extends BackgroundAudioTask {
     _audioPlayer.setVolume(0.5);
   }
 
-  /* You can implement your own custom actions here. */
-  @override
-  void onCustomAction(String name, arguments) {
-    switch (name) {
-      case 'audio_task':
-        final result = arguments as Map<dynamic, dynamic>;
-        final list = result['queue'] as List<dynamic>;
-        // set the queue and queueIndex resp.
-        _queue = list.map((item) => raw2mediaItem(item)).toList();
-        _queueIndex = result['index'];
-        // invoke our custom start.
-        customStart();
-        break;
-      default:
-    }
-  }
-
   /// Helper method to set background state with ease.
   void _setState({@required BasicPlaybackState state, int position}) {
     if (position == null) {
       position = _audioPlayer.playbackEvent.position.inMilliseconds;
     }
     AudioServiceBackground.setState(
-      controls: getControls(),
+      controls: controls,
       systemActions: [MediaAction.seekTo],
       basicState: state,
       position: position,
     );
   }
 
-  List<MediaControl> getControls() {
-    return [
-      skipToPreviousControl,
-      // switch the controls to play/pause.
-      _playing ? pauseControl : playControl,
-      skipToNextControl
-    ];
-  }
+  List<MediaControl> get controls => [
+        skipToPreviousControl,
+        // switch the controls to play/pause.
+        _playing ? pauseControl : playControl,
+        skipToNextControl
+      ];
 }
