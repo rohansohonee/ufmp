@@ -63,6 +63,7 @@ class NowPlaying extends StatelessWidget {
     );
   }
 
+  // TODO: (BUG) Improve seek bar code (pull request is welcome)
   Widget positionIndicator(MediaItem mediaItem, PlaybackState state) {
     double seekPos;
     return StreamBuilder(
