@@ -86,7 +86,8 @@ class AudioPlayerTask extends BackgroundAudioTask {
 
   @override
   void onPause() {
-    if (_audioPlayer.playbackState == AudioPlaybackState.connecting || _audioPlayer.playbackState == AudioPlaybackState.playing) {
+    if (_audioPlayer.playbackState == AudioPlaybackState.connecting ||
+        _audioPlayer.playbackState == AudioPlaybackState.playing) {
       _audioPlayer.pause();
       _playing = false;
       // Broadcast that we're paused.
@@ -114,8 +115,8 @@ class AudioPlayerTask extends BackgroundAudioTask {
           : BasicPlaybackState.skippingToNext,
     );
 
-    AudioServiceBackground.setMediaItem(_mediaItem);
     await _audioPlayer.setUrl(_mediaItem.extras['source']);
+    AudioServiceBackground.setMediaItem(_mediaItem);
     onPlay();
   }
 
