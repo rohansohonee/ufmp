@@ -86,10 +86,12 @@ class AudioPlayerTask extends BackgroundAudioTask {
 
   @override
   void onPause() {
-    _audioPlayer.pause();
-    _playing = false;
-    // Broadcast that we're paused.
-    _setState(state: BasicPlaybackState.paused);
+    if (_audioPlayer.playbackState == AudioPlaybackState.connecting || _audioPlayer.playbackState == AudioPlaybackState.playing) {
+      _audioPlayer.pause();
+      _playing = false;
+      // Broadcast that we're paused.
+      _setState(state: BasicPlaybackState.paused);
+    }
   }
 
   @override
