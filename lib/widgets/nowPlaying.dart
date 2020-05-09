@@ -1,15 +1,55 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:ufmp/utils/parseDuration.dart';
 import 'package:rxdart/rxdart.dart';
 
-class NowPlaying extends StatelessWidget {
+class NowPlaying extends StatefulWidget {
+  @override
+  _NowPlayingState createState() => _NowPlayingState();
+}
+
+class _NowPlayingState extends State<NowPlaying> {
   /// Tracks the position while the user drags the seek bar.
   final BehaviorSubject<double> _dragPositionSubject =
       BehaviorSubject.seeded(null);
+
+  StreamSubscription periodicSubscription, playbackStateSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+
+    periodicSubscription = Stream.periodic(Duration(seconds: 1)).listen((_) {
+      _dragPositionSubject.add(
+        AudioService.playbackState.currentPosition.toDouble(),
+      );
+    });
+
+    playbackStateSubscription = AudioService.playbackStateStream
+        .where((state) => state != null)
+        .listen((state) {
+      if (state.basicState == BasicPlaybackState.playing)
+        periodicSubscription.resume();
+      else {
+        if (!periodicSubscription.isPaused) {
+          periodicSubscription.pause();
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    periodicSubscription?.cancel();
+    playbackStateSubscription?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,18 +73,11 @@ class NowPlaying extends StatelessWidget {
       children: <Widget>[
         CachedNetworkImage(imageUrl: mediaItem.artUri),
         // Seek Bar
-        StreamBuilder<PlaybackState>(
-          stream: AudioService.playbackStateStream,
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              final state = snapshot.data;
-              final basicState = state?.basicState;
-              if (basicState != BasicPlaybackState.none &&
-                  basicState != BasicPlaybackState.stopped)
-                return positionIndicator(mediaItem, state);
-            }
-            return Container();
-          },
+        Stack(
+          children: <Widget>[
+            bufferedIndicator(mediaItem?.duration?.toDouble()),
+            positionIndicator(mediaItem),
+          ],
         ),
         SizedBox(height: 10.0),
         musicDetails(mediaItem),
@@ -63,16 +96,11 @@ class NowPlaying extends StatelessWidget {
     );
   }
 
-  // TODO: (BUG) Improve seek bar code (pull request is welcome)
-  Widget positionIndicator(MediaItem mediaItem, PlaybackState state) {
-    double seekPos;
-    return StreamBuilder(
-      stream: Rx.combineLatest2<double, double, double>(
-          _dragPositionSubject.stream,
-          Stream.periodic(Duration(milliseconds: 200)),
-          (dragPosition, _) => dragPosition),
+  Widget positionIndicator(MediaItem mediaItem) {
+    return StreamBuilder<double>(
+      stream: _dragPositionSubject.stream,
       builder: (context, snapshot) {
-        double position = snapshot.data ?? state.currentPosition?.toDouble();
+        double position = snapshot.data ?? 0.0;
         double duration = mediaItem?.duration?.toDouble();
         return Column(
           children: [
@@ -80,14 +108,15 @@ class NowPlaying extends StatelessWidget {
               Slider(
                 min: 0.0,
                 max: duration,
-                value: seekPos ?? max(0.0, min(position, duration)),
-                onChanged: (value) {
-                  _dragPositionSubject.add(value);
+                value: max(0.0, min(position, duration)),
+                onChangeStart: (_) {
+                  if (!periodicSubscription.isPaused)
+                    periodicSubscription.pause();
                 },
+                onChanged: (value) => _dragPositionSubject.add(value),
                 onChangeEnd: (value) {
                   AudioService.seekTo(value.toInt());
-                  seekPos = value;
-                  _dragPositionSubject.add(null);
+                  periodicSubscription.resume();
                 },
               ),
             Row(
@@ -109,19 +138,37 @@ class NowPlaying extends StatelessWidget {
     );
   }
 
-  Widget playControls() {
-    return StreamBuilder<PlaybackState>(
-      stream: AudioService.playbackStateStream,
+  Widget bufferedIndicator(double duration) {
+    return StreamBuilder(
+      stream: AudioService.customEventStream,
       builder: (context, snapshot) {
-        final basicState = snapshot.data?.basicState;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: <Widget>[
-            IconButton(
-              icon: Icon(Icons.skip_previous),
-              onPressed: () => AudioService.skipToPrevious(),
-            ),
-            IconButton(
+        return LinearPercentIndicator(
+          percent: !snapshot.hasData
+              ? 0.0
+              : (snapshot.data.toDouble() / duration) >= 0.9
+                  ? 1.0
+                  : snapshot.data.toDouble() / duration,
+          linearStrokeCap: LinearStrokeCap.butt,
+          lineHeight: 2.0,
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+        );
+      },
+    );
+  }
+
+  Widget playControls() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: <Widget>[
+        IconButton(
+          icon: Icon(Icons.skip_previous),
+          onPressed: () => AudioService.skipToPrevious(),
+        ),
+        StreamBuilder<PlaybackState>(
+          stream: AudioService.playbackStateStream,
+          builder: (context, snapshot) {
+            final basicState = snapshot.data?.basicState;
+            return IconButton(
               iconSize: 60.0,
               icon: Icon(
                 basicState == BasicPlaybackState.playing
@@ -131,14 +178,14 @@ class NowPlaying extends StatelessWidget {
               onPressed: () => basicState == BasicPlaybackState.playing
                   ? AudioService.pause()
                   : AudioService.play(),
-            ),
-            IconButton(
-              icon: Icon(Icons.skip_next),
-              onPressed: () => AudioService.skipToNext(),
-            ),
-          ],
-        );
-      },
+            );
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.skip_next),
+          onPressed: () => AudioService.skipToNext(),
+        ),
+      ],
     );
   }
 }
