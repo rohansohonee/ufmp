@@ -48,6 +48,14 @@ class AudioPlayerTask extends BackgroundAudioTask {
       _handlePlaybackCompleted();
     });
 
+    // Audio buffered position listener.
+    var playerBufferedSubscription = _audioPlayer.bufferedPositionStream
+        .where((position) => position != null)
+        .listen((position) {
+      if (position.inMilliseconds <= _mediaItem.duration)
+        AudioServiceBackground.sendCustomEvent(position.inMilliseconds);
+    });
+
     await _completer.future;
     // Broadcast that we've stopped.
     AudioServiceBackground.setState(
@@ -58,6 +66,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
     // Clean up resources
     _queue = null;
     playerStateSubscription.cancel();
+    playerBufferedSubscription.cancel();
     await _audioPlayer.dispose();
   }
 
@@ -123,6 +132,11 @@ class AudioPlayerTask extends BackgroundAudioTask {
   @override
   void onSeekTo(int position) {
     _audioPlayer.seek(Duration(milliseconds: position));
+    // Broadcast that we're seeking.
+    _setState(
+      state: AudioServiceBackground.state.basicState,
+      position: position,
+    );
   }
 
   @override
