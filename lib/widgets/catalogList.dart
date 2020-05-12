@@ -20,7 +20,13 @@ class CatalogList extends StatelessWidget {
           selected: snapshot.hasData
               ? (snapshot.data.id == data[index].id ? true : false)
               : false,
-          leading: CachedNetworkImage(imageUrl: data[index].image),
+          leading: AspectRatio(
+            aspectRatio: 1.0,
+            child: CachedNetworkImage(
+              imageUrl: data[index].image,
+              fit: BoxFit.fitHeight,
+            ),
+          ),
           title: Text(data[index].title),
           subtitle: Text(data[index].artist),
           trailing: Text(prettyDuration(data[index].duration)),
