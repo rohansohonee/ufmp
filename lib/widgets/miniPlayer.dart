@@ -11,20 +11,22 @@ class MiniPlayer extends StatelessWidget {
       stream: AudioService.currentMediaItemStream,
       builder: (context, snapshot) {
         if (snapshot.hasData) {
-          return GestureDetector(
-            child: Container(
-              color: Colors.blueGrey[300],
-              height: 80,
-              width: MediaQuery.of(context).size.width,
-              child: _miniPlayer(snapshot.data),
+          return Material(
+            color: Colors.blueGrey[300],
+            child: InkWell(
+              child: Container(
+                height: 65,
+                width: MediaQuery.of(context).size.width,
+                child: _miniPlayer(snapshot.data),
+              ),
+              onTap: () {
+                // Navigate to now playing page.
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => NowPlaying()),
+                );
+              },
             ),
-            onTap: () {
-              // Navigate to now playing page.
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => NowPlaying()),
-              );
-            },
           );
         }
         return Container(
@@ -33,7 +35,7 @@ class MiniPlayer extends StatelessWidget {
           width: MediaQuery.of(context).size.width,
           child: ListTile(
             isThreeLine: true,
-            leading: FlutterLogo(),
+            leading: FlutterLogo(size: 36),
             title: Text('Not Playing'),
             subtitle: Text('Tap on a song from the list.'),
           ),
@@ -43,36 +45,55 @@ class MiniPlayer extends StatelessWidget {
   }
 
   Widget _miniPlayer(MediaItem mediaItem) {
-    return ListTile(
-      isThreeLine: true,
-      leading: CachedNetworkImage(imageUrl: mediaItem.artUri),
-      title: Text(
-        mediaItem.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        '${mediaItem.album} • ${mediaItem.artist}',
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: StreamBuilder<PlaybackState>(
-        stream: AudioService.playbackStateStream,
-        builder: (context, snapshot) {
-          final state = snapshot.data?.basicState ?? BasicPlaybackState.stopped;
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              if (state == BasicPlaybackState.playing)
-                IconButton(icon: Icon(Icons.pause), onPressed: pause)
-              else
-                IconButton(icon: Icon(Icons.play_arrow), onPressed: play),
-              if (state != BasicPlaybackState.stopped)
-                IconButton(icon: Icon(Icons.skip_next), onPressed: skipNext),
-            ],
-          );
-        },
-      ),
+    return Row(
+      children: <Widget>[
+        AspectRatio(
+          aspectRatio: 1.0,
+          child: CachedNetworkImage(
+            imageUrl: mediaItem.artUri,
+            fit: BoxFit.fitHeight,
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  mediaItem.title,
+                  maxLines: 1,
+                  style: TextStyle(fontSize: 18),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${mediaItem.album} • ${mediaItem.artist}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+        StreamBuilder<PlaybackState>(
+          stream: AudioService.playbackStateStream,
+          builder: (context, snapshot) {
+            final state =
+                snapshot.data?.basicState ?? BasicPlaybackState.stopped;
+            return Row(
+              children: <Widget>[
+                if (state == BasicPlaybackState.playing)
+                  IconButton(icon: Icon(Icons.pause), onPressed: pause)
+                else
+                  IconButton(icon: Icon(Icons.play_arrow), onPressed: play),
+                if (state != BasicPlaybackState.stopped)
+                  IconButton(icon: Icon(Icons.skip_next), onPressed: skipNext),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 
