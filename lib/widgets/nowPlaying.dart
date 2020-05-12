@@ -71,7 +71,19 @@ class _NowPlayingState extends State<NowPlaying> {
   Widget nowPlayingScreen(MediaItem mediaItem) {
     return ListView(
       children: <Widget>[
-        CachedNetworkImage(imageUrl: mediaItem.artUri),
+        SizedBox(height: 10.0),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          margin: const EdgeInsets.symmetric(horizontal: 20.0),
+          elevation: 5.0,
+          child: AspectRatio(
+            aspectRatio: 1.0,
+            child: CachedNetworkImage(
+              imageUrl: mediaItem.artUri,
+              fit: BoxFit.fitHeight,
+            ),
+          ),
+        ),
         // Seek Bar
         Stack(
           children: <Widget>[
@@ -79,9 +91,9 @@ class _NowPlayingState extends State<NowPlaying> {
             positionIndicator(mediaItem),
           ],
         ),
-        SizedBox(height: 10.0),
+        SizedBox(height: 5.0),
         musicDetails(mediaItem),
-        SizedBox(height: 10.0),
+        SizedBox(height: 5.0),
         playControls(),
       ],
     );
