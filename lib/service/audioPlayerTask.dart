@@ -29,7 +29,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
   final AudioPlayer _audioPlayer = AudioPlayer();
   int _queueIndex = -1;
   static int clickDelay = 0;
-  List<MediaItem> _queue = List<MediaItem>();
+  List<MediaItem> _queue = <MediaItem>[];
   final _completer = Completer();
   bool _playing = false;
 
@@ -196,7 +196,8 @@ class AudioPlayerTask extends BackgroundAudioTask {
   @override
   void onAudioFocusGained() {
     _audioPlayer.setVolume(1.0);
-    onPlay();
+    if (AudioServiceBackground.state.basicState == BasicPlaybackState.paused)
+      onPlay();
   }
 
   @override
@@ -211,7 +212,6 @@ class AudioPlayerTask extends BackgroundAudioTask {
 
   @override
   void onAudioFocusLostTransientCanDuck() {
-    onPause();
     _audioPlayer.setVolume(0.5);
   }
 
