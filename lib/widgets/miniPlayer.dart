@@ -1,10 +1,46 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import 'nowPlaying.dart';
 
-class MiniPlayer extends StatelessWidget {
+class MiniPlayer extends StatefulWidget {
+  @override
+  _MiniPlayerState createState() => _MiniPlayerState();
+}
+
+class _MiniPlayerState extends State<MiniPlayer> {
+  StreamSubscription notificationClickSubscription;
+  bool pageOpened = false;
+
+  @override
+  void initState() {
+    super.initState();
+    notificationClickSubscription = AudioService.notificationClickEventStream
+        .where((event) => event)
+        .listen((event) {
+      if (!pageOpened) _openNowPlaying();
+    });
+  }
+
+  @override
+  void dispose() {
+    notificationClickSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _openNowPlaying() async {
+    // Navigate to now playing page.
+    pageOpened = true;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NowPlaying()),
+    );
+    pageOpened = false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<MediaItem>(
@@ -19,13 +55,7 @@ class MiniPlayer extends StatelessWidget {
                 width: MediaQuery.of(context).size.width,
                 child: _miniPlayer(snapshot.data),
               ),
-              onTap: () {
-                // Navigate to now playing page.
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => NowPlaying()),
-                );
-              },
+              onTap: _openNowPlaying,
             ),
           );
         }
@@ -80,14 +110,15 @@ class MiniPlayer extends StatelessWidget {
           stream: AudioService.playbackStateStream,
           builder: (context, snapshot) {
             final state =
-                snapshot.data?.basicState ?? BasicPlaybackState.stopped;
+                snapshot.data?.processingState ?? AudioProcessingState.stopped;
+            final playing = snapshot.data?.playing ?? false;
             return Row(
               children: <Widget>[
-                if (state == BasicPlaybackState.playing)
+                if (playing)
                   IconButton(icon: Icon(Icons.pause), onPressed: pause)
                 else
                   IconButton(icon: Icon(Icons.play_arrow), onPressed: play),
-                if (state != BasicPlaybackState.stopped)
+                if (state != AudioProcessingState.stopped)
                   IconButton(icon: Icon(Icons.skip_next), onPressed: skipNext),
               ],
             );
