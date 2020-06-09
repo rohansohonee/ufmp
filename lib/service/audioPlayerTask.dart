@@ -26,12 +26,13 @@ final skipToNextControl = MediaControl(
 );
 
 class AudioPlayerTask extends BackgroundAudioTask {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final _audioPlayer = AudioPlayer();
   int _queueIndex = -1;
   static int clickDelay = 0;
   List<MediaItem> _queue = <MediaItem>[];
   final _completer = Completer();
   bool _playing = false;
+  bool _interrupted = false;
 
   bool get hasNext => _queueIndex + 1 < _queue.length;
 
@@ -40,33 +41,34 @@ class AudioPlayerTask extends BackgroundAudioTask {
   MediaItem get _mediaItem => _queue[_queueIndex];
 
   @override
-  Future<void> onStart() async {
-    // Audio playback completed listener.
-    var playerStateSubscription = _audioPlayer.playbackStateStream
-        .where((state) => state == AudioPlaybackState.completed)
-        .listen((state) {
-      _handlePlaybackCompleted();
-    });
-
-    // Audio buffered position listener.
-    var playerBufferedSubscription = _audioPlayer.bufferedPositionStream
-        .where((position) => position != null)
-        .listen((position) {
-      if (position.inMilliseconds <= _mediaItem.duration)
-        AudioServiceBackground.sendCustomEvent(position.inMilliseconds);
+  Future<void> onStart(Map<String, dynamic> params) async {
+    // Audio playback event listener.
+    var playerEventSubscription =
+        _audioPlayer.playbackEventStream.listen((event) {
+      final bufferingState =
+          event.buffering ? AudioProcessingState.buffering : null;
+      switch (event.state) {
+        case AudioPlaybackState.paused:
+        case AudioPlaybackState.playing:
+          _setState(
+            state: bufferingState ?? AudioProcessingState.ready,
+            position: event.position,
+            bufferedPosition: event.bufferedPosition,
+          );
+          break;
+        case AudioPlaybackState.completed:
+          _handlePlaybackCompleted();
+          break;
+        default:
+          break;
+      }
     });
 
     await _completer.future;
-    // Broadcast that we've stopped.
-    AudioServiceBackground.setState(
-      controls: [],
-      basicState: BasicPlaybackState.stopped,
-    );
 
     // Clean up resources
     _queue = null;
-    playerStateSubscription.cancel();
-    playerBufferedSubscription.cancel();
+    playerEventSubscription.cancel();
     await _audioPlayer.dispose();
   }
 
@@ -79,7 +81,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
   }
 
   void playPause() {
-    if (AudioServiceBackground.state.basicState == BasicPlaybackState.playing)
+    if (AudioServiceBackground.state.playing)
       onPause();
     else
       onPlay();
@@ -87,20 +89,16 @@ class AudioPlayerTask extends BackgroundAudioTask {
 
   @override
   void onPlay() {
-    _audioPlayer.play();
     _playing = true;
-    // Broadcast that we're playing.
-    _setState(state: BasicPlaybackState.playing);
+    _audioPlayer.play();
   }
 
   @override
   void onPause() {
     if (_audioPlayer.playbackState == AudioPlaybackState.connecting ||
         _audioPlayer.playbackState == AudioPlaybackState.playing) {
-      _audioPlayer.pause();
       _playing = false;
-      // Broadcast that we're paused.
-      _setState(state: BasicPlaybackState.paused);
+      _audioPlayer.pause();
     }
   }
 
@@ -120,8 +118,8 @@ class AudioPlayerTask extends BackgroundAudioTask {
     // Broadcast that we're skipping.
     _setState(
       state: offset == -1
-          ? BasicPlaybackState.skippingToPrevious
-          : BasicPlaybackState.skippingToNext,
+          ? AudioProcessingState.skippingToPrevious
+          : AudioProcessingState.skippingToNext,
     );
 
     await _audioPlayer.setUrl(_mediaItem.extras['source']);
@@ -130,11 +128,11 @@ class AudioPlayerTask extends BackgroundAudioTask {
   }
 
   @override
-  void onSeekTo(int position) {
-    _audioPlayer.seek(Duration(milliseconds: position));
+  void onSeekTo(Duration position) {
+    _audioPlayer.seek(position);
     // Broadcast that we're seeking.
     _setState(
-      state: AudioServiceBackground.state.basicState,
+      state: AudioServiceBackground.state.processingState,
       position: position,
     );
   }
@@ -166,24 +164,28 @@ class AudioPlayerTask extends BackgroundAudioTask {
 
   @override
   void onPlayFromMediaId(String mediaId) async {
-    if (_playing) {
-      await _audioPlayer.stop();
-    }
+    if (_playing) await _audioPlayer.stop();
     _queueIndex = _queue.indexWhere((test) => test.id == mediaId);
-    AudioServiceBackground.setMediaItem(_mediaItem);
     await _audioPlayer.setUrl(_mediaItem.extras['source']);
+    AudioServiceBackground.setMediaItem(_mediaItem);
     onPlay();
   }
 
   @override
   Future<void> onStop() async {
     await _audioPlayer.stop();
+    // Broadcast that we've stopped.
+    await AudioServiceBackground.setState(
+      controls: [],
+      processingState: AudioProcessingState.stopped,
+      playing: false,
+    );
     _completer.complete();
   }
 
   @override
-  void onAddQueueItem(MediaItem mediaItem) {
-    _queue.add(mediaItem);
+  Future<void> onUpdateQueue(List<MediaItem> mediaItems) async {
+    _queue = mediaItems;
     AudioServiceBackground.setQueue(_queue);
   }
 
@@ -194,37 +196,50 @@ class AudioPlayerTask extends BackgroundAudioTask {
   }
 
   @override
-  void onAudioFocusGained() {
-    _audioPlayer.setVolume(1.0);
-    if (AudioServiceBackground.state.basicState == BasicPlaybackState.paused)
-      onPlay();
+  void onAudioFocusGained(AudioInterruption interruption) {
+    switch (interruption) {
+      case AudioInterruption.temporaryPause:
+        if (!_playing && _interrupted) onPlay();
+        break;
+      case AudioInterruption.temporaryDuck:
+        _audioPlayer.setVolume(1.0);
+        break;
+      default:
+        break;
+    }
+    _interrupted = false;
   }
 
   @override
-  void onAudioFocusLost() {
-    onPause();
-  }
-
-  @override
-  void onAudioFocusLostTransient() {
-    onPause();
-  }
-
-  @override
-  void onAudioFocusLostTransientCanDuck() {
-    _audioPlayer.setVolume(0.5);
+  void onAudioFocusLost(AudioInterruption interruption) {
+    if (_playing) _interrupted = true;
+    switch (interruption) {
+      case AudioInterruption.pause:
+      case AudioInterruption.temporaryPause:
+      case AudioInterruption.unknownPause:
+        onPause();
+        break;
+      case AudioInterruption.temporaryDuck:
+        _audioPlayer.setVolume(0.5);
+        break;
+    }
   }
 
   /// Helper method to set background state with ease.
-  void _setState({@required BasicPlaybackState state, int position}) {
+  void _setState(
+      {@required AudioProcessingState state,
+      Duration position,
+      Duration bufferedPosition}) {
     if (position == null) {
-      position = _audioPlayer.playbackEvent.position.inMilliseconds;
+      position = _audioPlayer.playbackEvent.position;
     }
     AudioServiceBackground.setState(
       controls: controls,
       systemActions: [MediaAction.seekTo],
-      basicState: state,
+      processingState: state,
+      playing: _playing,
       position: position,
+      bufferedPosition: bufferedPosition ?? position,
     );
   }
 

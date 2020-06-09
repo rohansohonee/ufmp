@@ -29,7 +29,9 @@ class CatalogList extends StatelessWidget {
           ),
           title: Text(data[index].title),
           subtitle: Text(data[index].artist),
-          trailing: Text(prettyDuration(data[index].duration)),
+          trailing: Text(
+            prettyDuration(Duration(seconds: data[index].duration)),
+          ),
           onTap: () => play(data[index].id),
         );
       },
@@ -45,9 +47,9 @@ class CatalogList extends StatelessWidget {
       if (await AudioService.start(
         backgroundTaskEntrypoint: backgroundTaskEntrypoint,
         androidNotificationChannelName: 'Playback',
-        notificationColor: 0xFF2196f3,
+        androidNotificationColor: 0xFF2196f3,
         androidStopForegroundOnPause: true,
-        enableQueue: true,
+        androidEnableQueue: true,
       )) {
         /* Process for setting up the queue */
 
@@ -58,7 +60,7 @@ class CatalogList extends StatelessWidget {
             album: catalog.album,
             title: catalog.title,
             artist: catalog.artist,
-            duration: durationInMillis(catalog.duration),
+            duration: Duration(seconds: catalog.duration),
             genre: catalog.genre,
             artUri: catalog.image,
             extras: {'source': catalog.source},
@@ -66,7 +68,7 @@ class CatalogList extends StatelessWidget {
         }).toList();
 
         // 2.Now we add our queue to audio player task.
-        await AudioService.addQueueItems(queue);
+        await AudioService.updateQueue(queue);
 
         // 3.Let's now begin the playback.
         AudioService.playFromMediaId(id);

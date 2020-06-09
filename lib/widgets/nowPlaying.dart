@@ -26,14 +26,14 @@ class _NowPlayingState extends State<NowPlaying> {
 
     periodicSubscription = Stream.periodic(Duration(seconds: 1)).listen((_) {
       _dragPositionSubject.add(
-        AudioService.playbackState.currentPosition.toDouble(),
+        AudioService.playbackState.currentPosition.inMilliseconds.toDouble(),
       );
     });
 
     playbackStateSubscription = AudioService.playbackStateStream
         .where((state) => state != null)
         .listen((state) {
-      if (state.basicState == BasicPlaybackState.playing)
+      if (state.playing)
         periodicSubscription.resume();
       else {
         if (!periodicSubscription.isPaused) {
@@ -87,7 +87,7 @@ class _NowPlayingState extends State<NowPlaying> {
         // Seek Bar
         Stack(
           children: <Widget>[
-            bufferedIndicator(mediaItem?.duration?.toDouble()),
+            bufferedIndicator(mediaItem?.duration?.inMilliseconds?.toDouble()),
             positionIndicator(mediaItem),
           ],
         ),
@@ -113,7 +113,7 @@ class _NowPlayingState extends State<NowPlaying> {
       stream: _dragPositionSubject.stream,
       builder: (context, snapshot) {
         double position = snapshot.data ?? 0.0;
-        double duration = mediaItem?.duration?.toDouble();
+        double duration = mediaItem?.duration?.inMilliseconds?.toDouble();
         return Column(
           children: [
             if (duration != null)
@@ -127,7 +127,7 @@ class _NowPlayingState extends State<NowPlaying> {
                 },
                 onChanged: (value) => _dragPositionSubject.add(value),
                 onChangeEnd: (value) {
-                  AudioService.seekTo(value.toInt());
+                  AudioService.seekTo(Duration(milliseconds: value.toInt()));
                   periodicSubscription.resume();
                 },
               ),
@@ -136,12 +136,15 @@ class _NowPlayingState extends State<NowPlaying> {
               children: <Widget>[
                 Padding(
                   padding: const EdgeInsets.only(left: 20.0),
-                  child: Text(prettyDuration(position ~/ 1000)),
+                  child: Text(
+                    prettyDuration(Duration(milliseconds: position.toInt())),
+                  ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 20.0),
-                  child: Text(prettyDuration(duration ~/ 1000)),
-                ),
+                if (duration != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 20.0),
+                    child: Text(prettyDuration(mediaItem.duration)),
+                  ),
               ],
             ),
           ],
@@ -151,19 +154,24 @@ class _NowPlayingState extends State<NowPlaying> {
   }
 
   Widget bufferedIndicator(double duration) {
-    return StreamBuilder(
-      stream: AudioService.customEventStream,
+    return StreamBuilder<PlaybackState>(
+      stream: AudioService.playbackStateStream,
       builder: (context, snapshot) {
-        return LinearPercentIndicator(
-          percent: !snapshot.hasData
-              ? 0.0
-              : (snapshot.data.toDouble() / duration) >= 0.9
-                  ? 1.0
-                  : snapshot.data.toDouble() / duration,
-          linearStrokeCap: LinearStrokeCap.butt,
-          lineHeight: 2.0,
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
-        );
+        if (snapshot.hasData) {
+          final bufferedPosition =
+              snapshot.data.bufferedPosition.inMilliseconds.toDouble();
+
+          return LinearPercentIndicator(
+            percent: max(0.0, min(bufferedPosition / duration, 1.0)),
+            linearStrokeCap: LinearStrokeCap.butt,
+            lineHeight: 2.0,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 24.0,
+            ),
+          );
+        }
+        return Container();
       },
     );
   }
@@ -179,17 +187,12 @@ class _NowPlayingState extends State<NowPlaying> {
         StreamBuilder<PlaybackState>(
           stream: AudioService.playbackStateStream,
           builder: (context, snapshot) {
-            final basicState = snapshot.data?.basicState;
+            final playing = snapshot.data?.playing ?? false;
             return IconButton(
               iconSize: 60.0,
-              icon: Icon(
-                basicState == BasicPlaybackState.playing
-                    ? Icons.pause
-                    : Icons.play_arrow,
-              ),
-              onPressed: () => basicState == BasicPlaybackState.playing
-                  ? AudioService.pause()
-                  : AudioService.play(),
+              icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+              onPressed: () =>
+                  playing ? AudioService.pause() : AudioService.play(),
             );
           },
         ),
