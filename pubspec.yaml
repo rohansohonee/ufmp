@@ -19,14 +19,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  just_audio: ^0.1.8
-  audio_service: ^0.8.0
+  just_audio: ^0.2.0
+  audio_service: ^0.10.0
   json_annotation: ^3.0.1
   dio: ^3.0.9
-  dio_http_cache: ^0.2.6
+  dio_http_cache: ^0.2.7
   cached_network_image: ^2.2.0
-  rxdart: ^0.24.0
-  percent_indicator: ^2.1.3
+  rxdart: ^0.24.1
+  percent_indicator: ^2.1.4
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -38,6 +38,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+# The following dependency is overrided since just_audio v0.2.0
+# depends on path v1.7.0.
+dependency_overrides:
+  path: ^1.7.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
