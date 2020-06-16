@@ -17,16 +17,19 @@ To get the latest dependencies:
 - **From Android Studio/IntelliJ:** Click ``Packages get`` in the action ribbon at the top of pubspec.yaml.
 - **From VS Code:** Click ``Get Packages`` located in right side of the action ribbon at the top of pubspec.yaml.
 
+>NOTE: The default branch has been renamed from **'master'** to **'main'**.
+
 ## Credits
 - [audio_service](https://pub.dev/packages/audio_service) and [just_audio](https://pub.dev/packages/just_audio) plugin developed by 
 [Ryan Heise](https://github.com/ryanheise)
 - The [Flutter](https://flutter.dev) and [Dart](https://dart.dev) team.
 - [dio](https://pub.dev/packages/dio) developed by [FlutterChinaClub](https://flutterchina.club/)
+- [percent_indicator](https://pub.dev/packages/percent_indicator) developed by [diegoveloper](https://diegoveloper.com/)
 
 ## Support
 If you've found an error in this sample, please [file an issue](https://github.com/rohansohonee/ufmp/issues)
 
-Patches are encouraged, and may be submitted by forking this project and submitting a pull request through GitHub. Please see [CONTRIBUTING.md](https://github.com/rohansohonee/ufmp/blob/master/CONTRIBUTING.md) for more details.
+Patches are encouraged, and may be submitted by forking this project and submitting a pull request through GitHub. Please see [CONTRIBUTING.md](https://github.com/rohansohonee/ufmp/blob/main/CONTRIBUTING.md) for more details.
 
 ## License
 MIT License
