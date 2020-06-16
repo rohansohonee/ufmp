@@ -19,8 +19,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  just_audio: ^0.2.0
-  audio_service: ^0.10.0
+  just_audio: ^0.2.1
+  audio_service: ^0.11.0
   json_annotation: ^3.0.1
   dio: ^3.0.9
   dio_http_cache: ^0.2.7
