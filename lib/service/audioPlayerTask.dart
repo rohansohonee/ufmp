@@ -30,7 +30,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
   int _queueIndex = -1;
   static int clickDelay = 0;
   List<MediaItem> _queue = <MediaItem>[];
-  final _completer = Completer();
+  StreamSubscription playerEventSubscription;
   bool _playing = false;
   bool _interrupted = false;
 
@@ -41,10 +41,9 @@ class AudioPlayerTask extends BackgroundAudioTask {
   MediaItem get _mediaItem => _queue[_queueIndex];
 
   @override
-  Future<void> onStart(Map<String, dynamic> params) async {
+  void onStart(Map<String, dynamic> params) async {
     // Audio playback event listener.
-    var playerEventSubscription =
-        _audioPlayer.playbackEventStream.listen((event) {
+    playerEventSubscription = _audioPlayer.playbackEventStream.listen((event) {
       final bufferingState =
           event.buffering ? AudioProcessingState.buffering : null;
       switch (event.state) {
@@ -63,13 +62,6 @@ class AudioPlayerTask extends BackgroundAudioTask {
           break;
       }
     });
-
-    await _completer.future;
-
-    // Clean up resources
-    _queue = null;
-    playerEventSubscription.cancel();
-    await _audioPlayer.dispose();
   }
 
   void _handlePlaybackCompleted() {
@@ -180,7 +172,12 @@ class AudioPlayerTask extends BackgroundAudioTask {
       processingState: AudioProcessingState.stopped,
       playing: false,
     );
-    _completer.complete();
+    // Clean up resources
+    _queue = null;
+    playerEventSubscription.cancel();
+    await _audioPlayer.dispose();
+    // Shutdown background task
+    await super.onStop();
   }
 
   @override
