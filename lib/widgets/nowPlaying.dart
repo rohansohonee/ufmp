@@ -5,8 +5,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
-import 'package:ufmp/utils/parseDuration.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:ufmp/utils/parseDuration.dart';
 
 class NowPlaying extends StatefulWidget {
   @override

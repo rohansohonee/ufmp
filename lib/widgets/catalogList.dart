@@ -9,6 +9,7 @@ import 'home.dart';
 class CatalogList extends StatelessWidget {
   final List<MusicCatalog> data;
   final int index;
+
   const CatalogList(this.data, this.index);
 
   @override
