@@ -14,13 +14,13 @@ description: A sample audio app for Flutter.
 version: 1.0.0+1
 
 environment:
-  sdk: ">=2.6.0 <3.0.0"
+  sdk: ">=2.7.0 <3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  just_audio: ^0.2.1
-  audio_service: ^0.11.0
+  just_audio: ^0.2.2
+  audio_service: ^0.11.2
   json_annotation: ^3.0.1
   dio: ^3.0.9
   dio_http_cache: ^0.2.7
@@ -37,11 +37,6 @@ dev_dependencies:
   json_serializable: ^3.3.0
   flutter_test:
     sdk: flutter
-
-# The following dependency is overrided since just_audio v0.2.0
-# depends on path v1.7.0.
-dependency_overrides:
-  path: ^1.7.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
