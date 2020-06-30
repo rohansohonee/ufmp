@@ -33,12 +33,10 @@ class _NowPlayingState extends State<NowPlaying> {
     playbackStateSubscription = AudioService.playbackStateStream
         .where((state) => state != null)
         .listen((state) {
-      if (state.playing)
+      if (state.playing) {
         periodicSubscription.resume();
-      else {
-        if (!periodicSubscription.isPaused) {
-          periodicSubscription.pause();
-        }
+      } else if (!periodicSubscription.isPaused) {
+        periodicSubscription.pause();
       }
     });
   }
@@ -102,7 +100,10 @@ class _NowPlayingState extends State<NowPlaying> {
   Widget musicDetails(MediaItem mediaItem) {
     return Column(
       children: <Widget>[
-        Text(mediaItem.title),
+        Text(
+          mediaItem.title,
+          style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
+        ),
         Text('${mediaItem.album} • ${mediaItem.artist}'),
       ],
     );
