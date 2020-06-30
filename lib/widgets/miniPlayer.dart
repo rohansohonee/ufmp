@@ -114,12 +114,17 @@ class _MiniPlayerState extends State<MiniPlayer> {
             final playing = snapshot.data?.playing ?? false;
             return Row(
               children: <Widget>[
-                if (playing)
-                  IconButton(icon: Icon(Icons.pause), onPressed: pause)
-                else
-                  IconButton(icon: Icon(Icons.play_arrow), onPressed: play),
+                // Play/pause button
+                IconButton(
+                  icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+                  onPressed: playing ? pause : play,
+                ),
+                // Skip next button
                 if (state != AudioProcessingState.stopped)
-                  IconButton(icon: Icon(Icons.skip_next), onPressed: skipNext),
+                  IconButton(
+                    icon: Icon(Icons.skip_next),
+                    onPressed: skipNext,
+                  ),
               ],
             );
           },
