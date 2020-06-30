@@ -159,7 +159,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
     if (_playing) await _audioPlayer.stop();
     _queueIndex = _queue.indexWhere((test) => test.id == mediaId);
     await _audioPlayer.setUrl(_mediaItem.extras['source']);
-    AudioServiceBackground.setMediaItem(_mediaItem);
+    onUpdateMediaItem(_mediaItem);
     onPlay();
   }
 
@@ -178,6 +178,11 @@ class AudioPlayerTask extends BackgroundAudioTask {
     await _audioPlayer.dispose();
     // Shutdown background task
     await super.onStop();
+  }
+
+  @override
+  Future<void> onUpdateMediaItem(MediaItem mediaItem) async {
+    AudioServiceBackground.setMediaItem(mediaItem);
   }
 
   @override

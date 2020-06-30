@@ -18,9 +18,8 @@ class CatalogList extends StatelessWidget {
       stream: AudioService.currentMediaItemStream,
       builder: (context, snapshot) {
         return ListTile(
-          selected: snapshot.hasData
-              ? (snapshot.data.id == data[index].id ? true : false)
-              : false,
+          selected:
+              snapshot.hasData ? (snapshot.data.id == data[index].id) : false,
           leading: AspectRatio(
             aspectRatio: 1.0,
             child: CachedNetworkImage(
@@ -33,13 +32,14 @@ class CatalogList extends StatelessWidget {
           trailing: Text(
             prettyDuration(Duration(seconds: data[index].duration)),
           ),
-          onTap: () => play(data[index].id),
+          onTap: () => play(),
         );
       },
     );
   }
 
-  play(String id) async {
+  void play() async {
+    final id = data[index].id;
     if (AudioService.running) {
       // The service is already running, hence we begin playback.
       AudioService.playFromMediaId(id);
@@ -68,7 +68,8 @@ class CatalogList extends StatelessWidget {
           );
         }).toList();
 
-        // 2.Now we add our queue to audio player task.
+        // 2.Now we add our queue to audio player task & update mediaItem.
+        await AudioService.updateMediaItem(queue[index]);
         await AudioService.updateQueue(queue);
 
         // 3.Let's now begin the playback.
