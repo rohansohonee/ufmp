@@ -5,8 +5,8 @@ The goal of this sample is to show how to implement an audio media app that work
 This [tutorial](https://github.com/ryanheise/audio_service/wiki/Tutorial) by @ryanheise is a good starting resource before playing around with this sample. It explains the key concepts that were used in this sample.
 
 <p>
-    <img width="250px" alt="home" src="https://raw.githubusercontent.com/rohansohonee/ufmp/main/screenshots/home.png" />
-    <img width="250px" alt="nowPlaying" src="https://raw.githubusercontent.com/rohansohonee/ufmp/main/screenshots/nowPlaying.png" />
+    <img width="250px" alt="home" src="https://user-images.githubusercontent.com/20875177/89710083-b4861380-d99d-11ea-8c55-750c65cc1db2.png" />
+    <img width="250px" alt="nowPlaying" src="https://user-images.githubusercontent.com/20875177/89710106-e5664880-d99d-11ea-9f08-eba35dc20427.png" />
 </p>
 
 ## Getting Started
