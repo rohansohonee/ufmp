@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final playControl = MediaControl(
   androidIcon: 'drawable/ic_action_play_arrow',
@@ -32,6 +33,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
   List<MediaItem> _queue = <MediaItem>[];
   StreamSubscription playerEventSubscription;
   bool _interrupted = false;
+  SharedPreferences prefs;
 
   bool get hasNext => _queueIndex + 1 < _queue.length;
 
@@ -40,7 +42,10 @@ class AudioPlayerTask extends BackgroundAudioTask {
   MediaItem get _mediaItem => _queue[_queueIndex];
 
   @override
-  void onStart(Map<String, dynamic> params) async {
+  Future<void> onStart(Map<String, dynamic> params) async {
+    // Get the shared preferences instance.
+    prefs = await SharedPreferences.getInstance();
+
     // Audio playback event listener.
     playerEventSubscription = _audioPlayer.playbackEventStream.listen((event) {
       switch (event.processingState) {
@@ -64,21 +69,23 @@ class AudioPlayerTask extends BackgroundAudioTask {
   void playPause() => _audioPlayer.playing ? onPause() : onPlay();
 
   @override
-  void onPlay() => _audioPlayer.play();
+  Future<void> onPlay() => _audioPlayer.play();
 
   @override
-  void onPause() {
+  Future<void> onPause() async {
     if (_audioPlayer.processingState == ProcessingState.loading ||
         _audioPlayer.playing) {
       _audioPlayer.pause();
+      // Save the current player position in seconds.
+      await prefs.setInt('position', _audioPlayer.position.inSeconds);
     }
   }
 
   @override
-  void onSkipToNext() => skip(1);
+  Future<void> onSkipToNext() => skip(1);
 
   @override
-  void onSkipToPrevious() => skip(-1);
+  Future<void> onSkipToPrevious() => skip(-1);
 
   Future<void> skip(int offset) async {
     final newIndex = _queueIndex + offset;
@@ -100,14 +107,19 @@ class AudioPlayerTask extends BackgroundAudioTask {
   }
 
   @override
-  void onSeekTo(Duration position) {
+  Future<void> onSeekTo(Duration position) async {
+    // Save the current player position in seconds.
+    await prefs.setInt('position', position.inSeconds);
+
+    // Seek to given position.
     _audioPlayer.seek(position);
+
     // Broadcast that we're seeking.
     _setState(state: AudioServiceBackground.state.processingState);
   }
 
   @override
-  void onClick(MediaButton button) {
+  Future<void> onClick(MediaButton button) async {
     switch (button) {
       case MediaButton.media:
         // Implemented 'double click to skip' feature for headset
@@ -131,7 +143,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
   }
 
   @override
-  void onPlayFromMediaId(String mediaId) async {
+  Future<void> onPlayFromMediaId(String mediaId) async {
     await _audioPlayer.stop();
     // Get queue index by mediaId.
     _queueIndex = _queue.indexWhere((test) => test.id == mediaId);
@@ -144,6 +156,10 @@ class AudioPlayerTask extends BackgroundAudioTask {
   @override
   Future<void> onStop() async {
     await _audioPlayer.stop();
+
+    // Save the current media item details.
+    await save();
+
     // Broadcast that we've stopped.
     await AudioServiceBackground.setState(
       controls: [],
@@ -171,10 +187,10 @@ class AudioPlayerTask extends BackgroundAudioTask {
 
   /* Manage Audio Focus */
   @override
-  void onAudioBecomingNoisy() => onPause();
+  Future<void> onAudioBecomingNoisy() => onPause();
 
   @override
-  void onAudioFocusGained(AudioInterruption interruption) {
+  Future<void> onAudioFocusGained(AudioInterruption interruption) async {
     switch (interruption) {
       case AudioInterruption.temporaryPause:
         if (!_audioPlayer.playing && _interrupted) onPlay();
@@ -189,7 +205,7 @@ class AudioPlayerTask extends BackgroundAudioTask {
   }
 
   @override
-  void onAudioFocusLost(AudioInterruption interruption) {
+  Future<void> onAudioFocusLost(AudioInterruption interruption) async {
     if (_audioPlayer.playing) _interrupted = true;
     switch (interruption) {
       case AudioInterruption.pause:
@@ -222,5 +238,17 @@ class AudioPlayerTask extends BackgroundAudioTask {
       _audioPlayer.playing ? pauseControl : playControl,
       skipToNextControl
     ];
+  }
+
+  /// Save the current media item into shared preferences.
+  Future<void> save() async {
+    await prefs.setString('id', _mediaItem.id);
+    await prefs.setString('album', _mediaItem.album);
+    await prefs.setString('title', _mediaItem.title);
+    await prefs.setString('artist', _mediaItem.artist);
+    await prefs.setString('genre', _mediaItem.genre);
+    await prefs.setString('artUri', _mediaItem.artUri);
+    await prefs.setInt('duration', _mediaItem.duration.inSeconds);
+    await prefs.setString('source', _mediaItem.extras['source']);
   }
 }
