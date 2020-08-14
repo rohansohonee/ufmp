@@ -5,8 +5,13 @@ import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
+import 'package:provider/provider.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ufmp/model/catalog.dart';
 import 'package:ufmp/utils/parseDuration.dart';
+
+import 'catalogList.dart';
 
 class NowPlaying extends StatefulWidget {
   @override
@@ -19,10 +24,12 @@ class _NowPlayingState extends State<NowPlaying> {
       BehaviorSubject.seeded(null);
 
   StreamSubscription periodicSubscription, playbackStateSubscription;
+  Future<SharedPreferences> sharedPreferences;
 
   @override
   void initState() {
     super.initState();
+    sharedPreferences = SharedPreferences.getInstance();
 
     periodicSubscription = Stream.periodic(Duration(seconds: 1)).listen((_) {
       _dragPositionSubject.add(
@@ -57,16 +64,41 @@ class _NowPlayingState extends State<NowPlaying> {
           stream: AudioService.currentMediaItemStream,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
-              return nowPlayingScreen(snapshot.data);
+              return nowPlayingScreen(mediaItem: snapshot.data);
             }
-            return Center(child: Text('Not Playing: Go back to home page.'));
+            return FutureBuilder<SharedPreferences>(
+              future: sharedPreferences,
+              builder: (context, prefSnapshot) {
+                if (prefSnapshot.hasData) {
+                  final prefs = prefSnapshot.data;
+                  if (prefs.containsKey('id')) {
+                    final mediaItem = MediaItem(
+                      id: prefs.getString('id'),
+                      album: prefs.getString('album'),
+                      title: prefs.getString('title'),
+                      artist: prefs.getString('artist'),
+                      duration: Duration(seconds: prefs.getInt('duration')),
+                      genre: prefs.getString('genre'),
+                      artUri: prefs.getString('artUri'),
+                      extras: {'source': prefs.getString('source')},
+                    );
+                    return nowPlayingScreen(
+                        mediaItem: mediaItem, loadFromPrefs: prefs);
+                  }
+                }
+                return Center(
+                  child: Text('Not Playing: Go back to home page.'),
+                );
+              },
+            );
           },
         ),
       ),
     );
   }
 
-  Widget nowPlayingScreen(MediaItem mediaItem) {
+  Widget nowPlayingScreen(
+      {MediaItem mediaItem, SharedPreferences loadFromPrefs}) {
     return ListView(
       children: <Widget>[
         SizedBox(height: 10.0),
@@ -86,13 +118,13 @@ class _NowPlayingState extends State<NowPlaying> {
         Stack(
           children: <Widget>[
             bufferedIndicator(mediaItem?.duration?.inMilliseconds?.toDouble()),
-            positionIndicator(mediaItem),
+            positionIndicator(mediaItem, loadFromPrefs),
           ],
         ),
         SizedBox(height: 5.0),
         musicDetails(mediaItem),
         SizedBox(height: 5.0),
-        playControls(),
+        playControls(mediaItem, loadFromPrefs),
       ],
     );
   }
@@ -102,18 +134,26 @@ class _NowPlayingState extends State<NowPlaying> {
       children: <Widget>[
         Text(
           mediaItem.title,
+          textAlign: TextAlign.center,
           style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
         ),
+        SizedBox(height: 10.0),
         Text('${mediaItem.album} • ${mediaItem.artist}'),
       ],
     );
   }
 
-  Widget positionIndicator(MediaItem mediaItem) {
+  Widget positionIndicator(MediaItem mediaItem, SharedPreferences prefs) {
     return StreamBuilder<double>(
       stream: _dragPositionSubject.stream,
       builder: (context, snapshot) {
-        double position = snapshot.data ?? 0.0;
+        double position = AudioService.running
+            ? snapshot.data ?? 0.0
+            : (prefs != null && prefs.containsKey('position'))
+                ? Duration(seconds: prefs.getInt('position'))
+                    .inMilliseconds
+                    .toDouble()
+                : 0.0;
         double duration = mediaItem?.duration?.inMilliseconds?.toDouble();
         return Column(
           children: [
@@ -177,14 +217,15 @@ class _NowPlayingState extends State<NowPlaying> {
     );
   }
 
-  Widget playControls() {
+  Widget playControls(MediaItem mediaItem, SharedPreferences loadFromPrefs) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: <Widget>[
-        IconButton(
-          icon: Icon(Icons.skip_previous),
-          onPressed: () => AudioService.skipToPrevious(),
-        ),
+        if (AudioService.running)
+          IconButton(
+            icon: Icon(Icons.skip_previous),
+            onPressed: () => AudioService.skipToPrevious(),
+          ),
         StreamBuilder<PlaybackState>(
           stream: AudioService.playbackStateStream,
           builder: (context, snapshot) {
@@ -192,16 +233,28 @@ class _NowPlayingState extends State<NowPlaying> {
             return IconButton(
               iconSize: 60.0,
               icon: Icon(playing ? Icons.pause : Icons.play_arrow),
-              onPressed: () =>
-                  playing ? AudioService.pause() : AudioService.play(),
+              onPressed: () => playing
+                  ? AudioService.pause()
+                  : play(mediaItem, loadFromPrefs),
             );
           },
         ),
-        IconButton(
-          icon: Icon(Icons.skip_next),
-          onPressed: () => AudioService.skipToNext(),
-        ),
+        if (AudioService.running)
+          IconButton(
+            icon: Icon(Icons.skip_next),
+            onPressed: () => AudioService.skipToNext(),
+          ),
       ],
     );
+  }
+
+  play(MediaItem mediaItem, SharedPreferences prefs) {
+    if (!AudioService.running && prefs != null) {
+      final items = Provider.of<CatalogModel>(context, listen: false).items;
+      int index = items.indexWhere((test) => test.id == mediaItem.id);
+      final position = Duration(seconds: prefs.getInt('position'));
+      playAudioByIndex(context, index, position);
+    } else
+      AudioService.play();
   }
 }
